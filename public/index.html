@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Chat App</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Add Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Group Voice Chat</h1>
+
+        <div id="authContainer">
+            <h2>Sign Up / Login</h2>
+            <input type="email" id="emailInput" placeholder="Email" required>
+            <input type="password" id="passwordInput" placeholder="Password" required>
+            <button id="signUpButton">Sign Up</button>
+            <button id="loginButton">Login</button>
+        </div>
+
+        <input type="text" id="roomInput" placeholder="Enter room name">
+        <button id="joinButton">Join Room</button>
+        
+        <div id="chatContainer" class="hidden">
+            <h2>Chat Room: <span id="roomName"></span></h2>
+            <audio id="remoteAudio" autoplay></audio>
+            <button id="leaveButton">Leave Room</button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="./app.js"></script>
+</body>
+</html>
