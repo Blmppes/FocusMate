@@ -3,35 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice Chat App</title>
+    <title>FocusMate</title>
+    <script type="module" src="app.js"></script>
+    <style>
+        .hidden {
+            display: none;
+        }
+    </style>
     <link rel="stylesheet" href="styles.css">
-    <!-- Add Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js"></script>
 </head>
 <body>
-    <div class="container">
-        <h1>Group Voice Chat</h1>
 
-        <div id="authContainer">
-            <h2>Sign Up / Login</h2>
-            <input type="email" id="emailInput" placeholder="Email" required>
-            <input type="password" id="passwordInput" placeholder="Password" required>
-            <button id="signUpButton">Sign Up</button>
-            <button id="loginButton">Login</button>
+    <!-- Authentication Section -->
+    <div id="authContainer">
+        <h2>Authentication</h2>
+        <input type="email" id="emailInput" placeholder="Enter your email" required>
+        <input type="password" id="passwordInput" placeholder="Enter your password" required>
+        <button id="signUpButton">Sign Up</button>
+        <button id="loginButton">Login</button>
+    </div>
+
+    <!-- Main Interface Section (hidden until logged in) -->
+    <div id="mainInterface" class="hidden">
+        <h2>Welcome to FocusMate</h2>
+        <button id="roomListButton">Refresh room List</button>
+        <button id="createRoomButton">Create a Room</button>
+        <div id="roomListContainer" class="hidden">
+            <h3>Available Rooms:</h3>
+            <ul id="roomList"></ul>
         </div>
 
-        <input type="text" id="roomInput" placeholder="Enter room name">
-        <button id="joinButton">Join Room</button>
-        
+        <!-- Chat Container for Voice Chat -->
         <div id="chatContainer" class="hidden">
-            <h2>Chat Room: <span id="roomName"></span></h2>
+            <h2 id="roomName"></h2>
             <audio id="remoteAudio" autoplay></audio>
             <button id="leaveButton">Leave Room</button>
         </div>
     </div>
 
+    <!-- Socket.io -->
     <script src="/socket.io/socket.io.js"></script>
-    <script type="module" src="./app.js"></script>
 </body>
 </html>

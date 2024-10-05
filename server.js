@@ -16,6 +16,12 @@ let rooms = {};
 io.on('connection', (socket) => {
     console.log('A user connected');
 
+    socket.on('create-room', (data) => {
+        const room = data.room;
+        rooms.push(room);
+        io.emit('new-room', { room });
+    });
+
     socket.on('join', (room) => {
         socket.join(room);
         console.log(`User joined room: ${room}`);
