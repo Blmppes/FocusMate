@@ -1,7 +1,3 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
-
 // Firebase configuration
 const firebaseConfig = {
     apiKey: "AIzaSyAaFKCGZBvdAEZscUPyFSUQCyr6hEzSYM8",
@@ -11,106 +7,125 @@ const firebaseConfig = {
     messagingSenderId: "420700192010",
     appId: "1:420700192010:web:46ae62aecb6db707cf0ef3",
     measurementId: "G-HDCEHBWS2R"
-};
+  };
+  
 
 // Initialize Firebase
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js";
+
 const app = initializeApp(firebaseConfig);
-const auth = getAuth();
-const db = getFirestore(app);
+const firestore = getFirestore(app);
+const auth = getAuth(app);
 const socket = io.connect('http://localhost:3000');
 
-// Room management
 let localStream;
 let peerConnection;
+let isInRoom = false;
 const roomInput = document.getElementById('roomInput');
 const joinButton = document.getElementById('joinButton');
 const leaveButton = document.getElementById('leaveButton');
 const chatContainer = document.getElementById('chatContainer');
 const roomNameDisplay = document.getElementById('roomName');
 const remoteAudio = document.getElementById('remoteAudio');
+const roomListContainer = document.getElementById('roomListContainer');
 
-// Authentication
-document.getElementById('signUpButton').onclick = () => {
+function clearInactivityAlert() {
+    // Implement logic to clear any inactivity alert
+}
+
+// Add event listeners to handle visibility change and blur
+document.addEventListener('visibilitychange', handleVisibilityChange);
+window.onblur = handleVisibilityChange;
+window.onfocus = () => {
+    clearInactivityAlert();
+};
+
+// Handle visibility change
+function handleVisibilityChange() {
+    if (document.hidden && isInRoom) { // Only check inactivity if user is in a room
+        const roomName = roomNameDisplay.textContent;
+        socket.emit('leave-room', roomName); // Notify server
+        alert("You've left the room due to inactivity.");
+        chatContainer.classList.add('hidden');
+        leaveButton.classList.add('hidden');
+        roomNameDisplay.textContent = '';
+        isInRoom = false; // Reset the room status
+    }
+}
+
+// Sign Up
+const signUpButton = document.getElementById('signUpButton');
+signUpButton.onclick = () => {
     const email = document.getElementById('emailInput').value;
     const password = document.getElementById('passwordInput').value;
 
     createUserWithEmailAndPassword(auth, email, password)
         .then(() => {
+            console.log('User signed up');
             alert('Sign Up Successful! You can now log in.');
         })
         .catch((error) => {
+            console.error('Error signing up:', error);
             alert(error.message);
         });
 };
 
-document.getElementById('loginButton').onclick = () => {
+// Login
+const loginButton = document.getElementById('loginButton');
+loginButton.onclick = () => {
     const email = document.getElementById('emailInput').value;
     const password = document.getElementById('passwordInput').value;
 
     signInWithEmailAndPassword(auth, email, password)
         .then(() => {
+            console.log('User logged in');
             document.getElementById('authContainer').classList.add('hidden');
             document.getElementById('mainInterface').classList.remove('hidden');
+            roomInput.focus();
         })
         .catch((error) => {
+            console.error('Error logging in:', error);
             alert(error.message);
         });
 };
 
-// Join Room Automatically After Creation
-document.getElementById('createRoomButton').onclick = async () => {
-    const roomName = prompt("Enter the name for your room:");
+// Join Room
+joinButton.onclick = async () => {
+    const roomName = roomInput.value;
     if (roomName) {
-        try {
-            // Add room to Firestore
-            await addDoc(collection(db, 'rooms'), { name: roomName });
-            console.log("Room created:", roomName);
-            // Automatically join the room after creation
-            joinRoom(roomName);
-        } catch (error) {
-            console.error("Error creating room:", error);
+        const roomsSnapshot = await getDocs(collection(firestore, "rooms"));
+        const roomExists = roomsSnapshot.docs.some(doc => doc.data().name === roomName);
+
+        if (roomExists) {
+            roomNameDisplay.textContent = roomName;
+            chatContainer.classList.remove('hidden');
+            leaveButton.classList.remove('hidden'); // Show Leave Room button
+            isInRoom = true; // Set to true when joining a room
+            localStream = await startVoiceChat();
+            createPeerConnection();
+
+            // Notify server that user has joined the room
+            socket.emit('join-room', roomName);
+            alert("You are now in the room. Please focus on this app.");
+        } else {
+            alert("The room does not exist. Please check the room name.");
         }
+    } else {
+        alert("Please enter a room name.");
     }
 };
 
-// Join an Existing Room from the List
-function createRoomList() {
-    const roomListContainer = document.getElementById('roomListContainer');
-    roomListContainer.innerHTML = ''; // Clear the list before reloading it
-
-    getDocs(collection(db, 'rooms')).then((querySnapshot) => {
-        querySnapshot.forEach((doc) => {
-            const roomItem = document.createElement('div');
-            roomItem.textContent = doc.data().name;
-            roomItem.classList.add('roomItem');
-            roomItem.onclick = () => {
-                joinRoom(doc.data().name);  // Join the clicked room
-            };
-            roomListContainer.appendChild(roomItem);
-        });
-    }).catch((error) => {
-        console.error("Error fetching rooms:", error);
-    });
-}
-
-document.getElementById('roomListButton').onclick = () => {
-    document.getElementById('roomListContainer').classList.remove('hidden');
-    createRoomList();  // Load the room list
-};
-
-// Join Room Function
-async function joinRoom(roomName) {
-    roomNameDisplay.textContent = roomName;
-    chatContainer.classList.remove('hidden');
-    localStream = await startVoiceChat();
-    createPeerConnection(roomName);
-}
 
 // Leave Room
 leaveButton.onclick = () => {
+    const roomName = roomNameDisplay.textContent;
+    socket.emit('leave-room', roomName); // Notify server
     chatContainer.classList.add('hidden');
     roomNameDisplay.textContent = '';
-    socket.disconnect();
+    leaveButton.classList.add('hidden'); // Hide Leave Room button
+    isInRoom = false; // Reset the room status
 };
 
 // Start Voice Chat
@@ -124,7 +139,7 @@ async function startVoiceChat() {
 }
 
 // Create Peer Connection
-function createPeerConnection(roomName) {
+function createPeerConnection() {
     peerConnection = new RTCPeerConnection();
     localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
@@ -134,7 +149,7 @@ function createPeerConnection(roomName) {
 
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
-            socket.emit('ice-candidate', { candidate: event.candidate, room: roomName });
+            socket.emit('ice-candidate', { candidate: event.candidate, room: roomNameDisplay.textContent });
         }
     };
 
@@ -142,7 +157,7 @@ function createPeerConnection(roomName) {
         await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
-        socket.emit('answer', { answer: answer, room: roomName });
+        socket.emit('answer', { answer: answer, room: roomNameDisplay.textContent });
     });
 
     socket.on('answer', async (data) => {
@@ -152,4 +167,67 @@ function createPeerConnection(roomName) {
     socket.on('ice-candidate', async (data) => {
         await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
     });
+
+    socket.on('user-joined', (id) => {
+        console.log(`User joined: ${id}`);
+    });
+
+    socket.on('user-left', (id) => {
+        console.log(`User left: ${id}`);
+    });
+
+    socket.on('disconnect-users', () => {
+        alert("You have been disconnected from the room.");
+        chatContainer.classList.add('hidden');
+        leaveButton.classList.add('hidden');
+        roomNameDisplay.textContent = '';
+    });
 }
+
+// Room List button functionality
+const roomListButton = document.getElementById('roomListButton');
+roomListButton.onclick = async () => {
+    const rooms = await getDocs(collection(firestore, "rooms"));
+    roomListContainer.innerHTML = ''; // Clear previous rooms
+    rooms.forEach((doc) => {
+        const li = document.createElement('li');
+        li.textContent = doc.data().name; // Use the stored room name
+        li.onclick = async () => {
+            // Join the room
+            const roomName = doc.data().name;
+            socket.emit('join-room', roomName); // Use the stored room name
+            roomNameDisplay.textContent = roomName; // Update room name display
+            chatContainer.classList.remove('hidden');
+            leaveButton.classList.remove('hidden'); // Show Leave Room button
+            isInRoom = true; // Set to true when joining a room
+
+            // Start voice chat
+            localStream = await startVoiceChat();
+            createPeerConnection();
+
+            alert("You are now in the room. Please focus on this app.");
+        };
+        roomListContainer.appendChild(li);
+    });
+    roomListContainer.classList.remove('hidden');
+};
+
+
+// Create Room functionality
+const createRoomButton = document.getElementById('createRoomButton');
+createRoomButton.onclick = async () => {
+    const roomName = prompt("Enter room name:");
+    if (roomName) {
+        await addDoc(collection(firestore, "rooms"), { name: roomName }); // Save room name in Firestore
+        socket.emit('join-room', roomName);
+        chatContainer.classList.remove('hidden');
+
+        // Start voice chat
+        localStream = await startVoiceChat();
+        createPeerConnection();
+
+        roomNameDisplay.textContent = roomName;
+        leaveButton.classList.remove('hidden');
+        alert("You are now in a room. Please focus on this app.");
+    }
+};
